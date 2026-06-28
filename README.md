@@ -1,4 +1,4 @@
- Horizon RealEstate360
+🏢 Horizon RealEstate360
 
 
 A production-grade, full-stack Property Management & Real Estate Operations platform built with Java Spring Boot Microservices and a React 18 SPA.
