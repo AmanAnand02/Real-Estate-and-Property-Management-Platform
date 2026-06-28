@@ -1,36 +1,27 @@
 🏢 Horizon RealEstate360
-
-
 A production-grade, full-stack Property Management & Real Estate Operations platform built with Java Spring Boot Microservices and a React 18 SPA.
 
 
-
-
 📌 Project Description
-
 Horizon RealEstate360 is an enterprise-level property management system designed to handle end-to-end real estate operations — from property listings and lease management to billing, maintenance, compliance, and tenant self-service. The platform is built on a Microservices Architecture with 10 independently deployable backend services, a unified API Gateway, Eureka service discovery, and a modern React frontend — all containerized with Docker Compose for one-command local deployment.
 
 Built during my internship at Cognizant (Feb 2026 – Jun 2026) as a Java Full Stack Developer.
 
-
 🛠️ Tech Stack
 
 Backend
-
-LayerTechnologyFrameworkJava Spring BootMicroservicesSpring Cloud (Eureka, API Gateway)SecuritySpring Security, JWT, RBAC, bcryptORMSpring Data JPA, HibernateDatabaseMySQL 8.0MigrationsFlywayContainerizationDocker, Docker ComposeAPI DocsOpenAPI / Swagger
+Java Spring Boot Microservices Spring Cloud (Eureka, API Gateway)SecuritySpring Security, JWT, RBAC, bcryptORMSpring Data JPA, Hibernate Database MySQL 8.0MigrationsFlywayContainerizationDocker, Docker ComposeAPI DocsOpenAPI / Swagger
 
 Frontend
-
-LayerTechnologyFrameworkReact 18State ManagementRedux Toolkit (RTK Query)RoutingReact Router v6FormsReact Hook Form + ZodUIReact BootstrapBuild ToolVite
+Framework React 18 State Management Redux Toolkit (RTK Query)Routing React Router v6 Forms React Hook Form + ZodUIReact BootstrapBuild ToolVite
 
 Testing
-
-TypeToolsBackend Unit & IntegrationJUnit 5, MockitoFrontend UnitVitest, React Testing Library, MSW
+Backend Unit & IntegrationJUnit 5, Mockito Frontend UnitVitest, React Testing Library, MSW
 
 
 📦 Microservices Breakdown
 
-ServicePortResponsibilityAPI Gateway9090Single entry point, JWT filter, load balancingDiscovery (Eureka)8761Service registry for all microservicesIAM Service8082User auth, JWT minting, roles, RBACProperty Service8081Properties, units, amenities, media, availabilityLeasing Service8083Listings, applications, leases, lease workflowsTenant Service8084Tenant profiles, documents, service requestsMaintenance Service8085Work orders, vendors, part inventory, schedulesCompliance Service8086Audit logs, compliance reports, retention policiesBilling Service8087Invoices, receipts, ledger, deposits, adjustmentsAsset Service8088Asset tracking, maintenance plans, space utilizationReporting Service8089KPI reports, datasets, scheduled report jobsNotification Service8090Alert rules, escalation scheduler, in-app & email
+Service PortResponsibility API Gateway 9090 Single entry point, JWT filter, load balancing Discovery (Eureka)8761 Service registry for all microservices IAM Service 8082 User auth, JWT minting, roles, RBAC Property Service 8081 Properties, units, amenities, media, availability Leasing Service 8083 Listings, applications, leases, lease workflows Tenant Service 8084 Tenant profiles, documents, service requests Maintenance Service 8085 Work orders, vendors, part inventory, schedules Compliance Service 8086 Audit logs, compliance reports, retention policies Billing Service 8087 Invoices, receipts, ledger, deposits, adjustments Asset Service 8088 Asset tracking, maintenance plans, space utilization Reporting Service 8089 KPI reports, datasets, scheduled report jobs Notification Service 8090 Alert rules, escalation scheduler, in-app & email
 
 
 ✨ Key Features
