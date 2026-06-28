@@ -1,0 +1,279 @@
+# =====================================================================
+# RealEstate360 — fleet-wide orchestration (with API Gateway + Eureka)
+#
+# Topology:
+#   * mysql         — DB on 3306, auto-seeds schema + users on first boot
+#   * discovery     — Eureka server on 8761; everyone else registers here
+#   * gateway       — Spring Cloud Gateway on 8080; single point of entry
+#   * 10 services   — register with discovery, addressable via lb://<name>
+#
+# Front-end clients should hit the gateway (port 8080). Direct service
+# ports (8081-8090) stay exposed so existing dev curl flows and smoke
+# tests continue to work.
+#
+# Usage:
+#   docker compose up -d                # start everything
+#   docker compose logs -f gateway      # tail one service
+#   docker compose down -v              # tear down + wipe DB volume
+#
+# Reset (re-run schema/users init):
+#   docker compose down -v && docker compose up -d --build
+# =====================================================================
+
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: re360-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      TZ: UTC
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./real_db_schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./real_db_users.sql:/docker-entrypoint-initdb.d/02-users.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ---- Eureka service registry ----
+  discovery:
+    build:
+      context: ./discovery-service/discovery-service
+    container_name: re360-discovery
+    ports:
+      - "8761:8761"
+    environment:
+      EUREKA_HOSTNAME: discovery
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8761/actuator/health/liveness"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ---- Spring Cloud Gateway (single entry point) ----
+  gateway:
+    build:
+      context: ./gateway-service/gateway-service
+    container_name: re360-gateway
+    depends_on:
+      discovery:
+        condition: service_healthy
+    ports:
+      - "9090:9090"
+    environment:
+      EUREKA_URL: http://discovery:8761/eureka/
+      JWT_SECRET: change-me-please-use-a-very-long-secret-key-32+chars-utf8
+      JWT_ISSUER: realestate360-iam
+
+  # ---- IAM (mints JWTs; everything else validates with shared secret) ----
+  iam:
+    build:
+      context: ./iam-service/iam-service
+    container_name: re360-iam
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/realestate3601?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      DB_USER: iam_user
+      DB_PASSWORD: CHANGE_ME_iam_pwd
+      JWT_SECRET: change-me-please-use-a-very-long-secret-key-32+chars-utf8
+      JWT_ISSUER: realestate360-iam
+      JWT_EXPIRATION_MS: 86400000
+      EUREKA_URL: http://discovery:8761/eureka/
+
+  property:
+    build:
+      context: ./property-service/property-service
+    container_name: re360-property
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/realestate3601?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      DB_USER: property_user
+      DB_PASSWORD: CHANGE_ME_property_pwd
+      JWT_SECRET: change-me-please-use-a-very-long-secret-key-32+chars-utf8
+      JWT_ISSUER: realestate360-iam
+      SERVICES_COMPLIANCE_BASE_URL: http://compliance:8086
+      EUREKA_URL: http://discovery:8761/eureka/
+
+  leasing:
+    build:
+      context: ./leasing-service/leasing-service
+    container_name: re360-leasing
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery:
+        condition: service_healthy
+    ports:
+      - "8083:8083"
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/realestate3601?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      DB_USER: leasing_user
+      DB_PASSWORD: CHANGE_ME_leasing_pwd
+      JWT_SECRET: change-me-please-use-a-very-long-secret-key-32+chars-utf8
+      JWT_ISSUER: realestate360-iam
+      SERVICES_COMPLIANCE_BASE_URL: http://compliance:8086
+      EUREKA_URL: http://discovery:8761/eureka/
+
+  tenant:
+    build:
+      context: ./tenant-service/tenant-service
+    container_name: re360-tenant
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery:
+        condition: service_healthy
+    ports:
+      - "8084:8084"
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/realestate3601?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      DB_USERNAME: tenant_user
+      DB_PASSWORD: CHANGE_ME_tenant_pwd
+      JWT_SECRET: change-me-please-use-a-very-long-secret-key-32+chars-utf8
+      JWT_ISSUER: realestate360-iam
+      # tenant-service is the only outbound REST caller; uses direct URLs
+      # (not lb://) for now — service-discovery for outbound calls is a
+      # follow-up.
+      LEASING_SERVICE_URL: http://leasing:8083
+      MAINTENANCE_SERVICE_URL: http://maintenance:8085
+      ACCOUNTING_SERVICE_URL: http://billing:8087
+      EUREKA_URL: http://discovery:8761/eureka/
+
+  maintenance:
+    build:
+      context: ./maintenance-service/maintenance-service
+    container_name: re360-maintenance
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery:
+        condition: service_healthy
+    ports:
+      - "8085:8085"
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/realestate3601?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      DB_USERNAME: maintenance_user
+      DB_PASSWORD: CHANGE_ME_maintenance_pwd
+      JWT_SECRET: change-me-please-use-a-very-long-secret-key-32+chars-utf8
+      JWT_ISSUER: realestate360-iam
+      SERVICES_COMPLIANCE_BASE_URL: http://compliance:8086
+      EUREKA_URL: http://discovery:8761/eureka/
+
+  compliance:
+    build:
+      context: ./compliance-service/compliance-service
+    container_name: re360-compliance
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery:
+        condition: service_healthy
+    ports:
+      - "8086:8086"
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/realestate3601?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      DB_USER: compliance_user
+      DB_PASSWORD: CHANGE_ME_compliance_pwd
+      JWT_SECRET: change-me-please-use-a-very-long-secret-key-32+chars-utf8
+      JWT_ISSUER: realestate360-iam
+      EUREKA_URL: http://discovery:8761/eureka/
+
+  billing:
+    build:
+      context: ./billing-service/billing-service
+    container_name: re360-billing
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery:
+        condition: service_healthy
+    ports:
+      - "8087:8087"
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/realestate3601?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      DB_USERNAME: accounting_user
+      DB_PASSWORD: CHANGE_ME_accounting_pwd
+      JWT_SECRET: change-me-please-use-a-very-long-secret-key-32+chars-utf8
+      JWT_ISSUER: realestate360-iam
+      SERVICES_COMPLIANCE_BASE_URL: http://compliance:8086
+      EUREKA_URL: http://discovery:8761/eureka/
+
+  asset:
+    build:
+      context: ./asset-service/asset-service
+    container_name: re360-asset
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery:
+        condition: service_healthy
+    ports:
+      - "8088:8088"
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/realestate3601?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      DB_USERNAME: asset_user
+      DB_PASSWORD: asset_pass
+      JWT_SECRET: change-me-please-use-a-very-long-secret-key-32+chars-utf8
+      JWT_ISSUER: realestate360-iam
+      SERVICES_COMPLIANCE_BASE_URL: http://compliance:8086
+      EUREKA_URL: http://discovery:8761/eureka/
+
+  reporting:
+    build:
+      context: ./reporting-service/reporting-service/reporting-service
+    container_name: re360-reporting
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery:
+        condition: service_healthy
+    ports:
+      - "8089:8089"
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/realestate3601?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      DB_USERNAME: reporting_user
+      DB_PASSWORD: reporting_pass
+      JWT_SECRET: change-me-please-use-a-very-long-secret-key-32+chars-utf8
+      JWT_ISSUER: realestate360-iam
+      EUREKA_URL: http://discovery:8761/eureka/
+
+  notification:
+    build:
+      context: ./notification-service/notification-service
+    container_name: re360-notification
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery:
+        condition: service_healthy
+    ports:
+      - "8090:8090"
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/realestate3601?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      DB_USERNAME: notifications_user
+      DB_PASSWORD: CHANGE_ME_notifications_pwd
+      JWT_SECRET: change-me-please-use-a-very-long-secret-key-32+chars-utf8
+      JWT_ISSUER: realestate360-iam
+      EUREKA_URL: http://discovery:8761/eureka/
+
+volumes:
+  mysql_data:

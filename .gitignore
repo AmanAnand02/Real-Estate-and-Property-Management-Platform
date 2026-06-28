@@ -1,0 +1,50 @@
+# ── Build outputs ─────────────────────────────────────────────────────────────
+target/
+*.jar
+*.war
+*.class
+
+# ── IDE — IntelliJ ────────────────────────────────────────────────────────────
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# ── IDE — Eclipse / STS (your current IDE) ────────────────────────────────────
+.classpath
+.project
+.settings/
+.sts4-cache/
+
+.springBeans
+
+# ── Secrets — NEVER commit these ──────────────────────────────────────────────
+.env
+*.pem
+*.key
+*.p12
+*.jks
+application-prod.properties
+application-staging.properties
+
+# ── Maven wrapper cache ────────────────────────────────────────────────────────
+.mvn/wrapper/maven-wrapper.jar
+
+# ── OS files ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Test reports ──────────────────────────────────────────────────────────────
+surefire-reports/
+
+# ── Frontend (React SPA) ──────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/.vite/
